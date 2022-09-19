@@ -8,6 +8,8 @@
 
 #include "GLSLShader.h"
 
+#include <algorithm>
+
 #define GL_CHECK_ERRORS assert(glGetError()==GL_NO_ERROR);
 
 using namespace std;
@@ -19,39 +21,14 @@ const int HEIGHT = 960;
 //shader reference
 GLSLShader shader;
 
-//vertex array and vertex buffer object IDs
+//vertex array and vertex buffer object ids
 GLuint vaoID;
 GLuint vboVerticesID;
 GLuint vboIndicesID;
 
-// //out vertex struct for interleaved attributes
-// struct Vertex {
-// 	glm::vec3 position;
-// 	glm::vec3 color;
-// };
-
-// //triangle vertices and indices
-// Vertex vertices[3];
-// GLushort indices[3];
-
-// //projection and modelview matrices
-// glm::mat4  P = glm::mat4(1);
-// glm::mat4 MV = glm::mat4(1);
-const int NUM_X = 40; //total quads on X axis
-const int NUM_Z = 40; //total quads on Z axis
-
-const float SIZE_X = 4; //size of plane in world space
-const float SIZE_Z = 4;
-const float HALF_SIZE_X = SIZE_X/2.0f;
-const float HALF_SIZE_Z = SIZE_Z/2.0f;
-
-//ripple displacement speed
-const float SPEED = 2;
-
-//ripple mesh vertices and indices
-glm::vec3 vertices[(NUM_X+1)*(NUM_Z+1)];
-const int TOTAL_INDICES = NUM_X*NUM_Z*2*3;
-GLushort indices[TOTAL_INDICES];
+//mesh vertices and indices
+glm::vec3 vertices[4];
+GLushort indices[6];
 
 //projection and modelview matrices
 glm::mat4  P = glm::mat4(1);
@@ -59,10 +36,13 @@ glm::mat4 MV = glm::mat4(1);
 
 //camera transformation variables
 int state = 0, oldX=0, oldY=0;
-float rX=25, rY=-40, dist = -7;
+float rX=25, rY=-40, dist = -50	;
+ 
+//number of sub-divisions
+int sub_divisions = 1;
 
-//current time
-float timee = 0;
+//modelling matrix of each instance
+glm::mat4 M[4];
 
 //mosue click handler
 void OnMouseDown(int button, int s, int x, int y)
@@ -95,6 +75,18 @@ void OnMouseMove(int x, int y)
 	//glutPostRedisplay();
 }
 
+//key event handler to increase/decrease number of sub-divisions
+// void OnKey(unsigned char key, int x, int y) {
+// 	switch(key) {
+// 		case ',':	sub_divisions--; break;
+// 		case '.':	sub_divisions++; break;
+// 	}
+
+// 	sub_divisions = max(1,min(8, sub_divisions));
+
+// 	//glutPostRedisplay();
+// }
+
 void glfw_mouse_inputs(GLFWwindow* window) {
 	// Stores the coordinates of the cursor
 		double mouseX;
@@ -125,55 +117,53 @@ void glfw_mouse_inputs(GLFWwindow* window) {
 
 //Opengl initialization
 void OnInit() {
-//set the polygon mode to render lines
-	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	//set the instance modeling matrix
+	M[0] = glm::translate(glm::mat4(1), glm::vec3(-5,0,-5));
+	M[1] = glm::translate(M[0], glm::vec3(10,0,0));
+	M[2] = glm::translate(M[1], glm::vec3(0,0,10));
+	M[3] = glm::translate(M[2], glm::vec3(-10,0,0));
 
 	GL_CHECK_ERRORS
 	//load shader
 	shader.LoadFromFile(GL_VERTEX_SHADER, "shaders/shader.vert");
+	shader.LoadFromFile(GL_GEOMETRY_SHADER, "shaders/shader.geom");
 	shader.LoadFromFile(GL_FRAGMENT_SHADER, "shaders/shader.frag");
 	//compile and link shader
 	shader.CreateAndLinkProgram();
 	shader.Use();
-		//add shader attribute and uniforms
+		//add attribute and uniform
 		shader.AddAttribute("vVertex");
-		shader.AddUniform("MVP");
-		shader.AddUniform("timee");
-	shader.UnUse();
+		shader.AddUniform("PV");
+		shader.AddUniform("M");
+		shader.AddUniform("sub_divisions");
+
+		//set values of constant uniforms at initialization
+		glUniform1i(shader("sub_divisions"), sub_divisions);
+		glUniformMatrix4fv(shader("M"), 4, GL_FALSE, glm::value_ptr(M[0]));
+ 	shader.UnUse();
 
 	GL_CHECK_ERRORS
 
-	//setup plane geometry
-	//setup plane vertices
-	int count = 0;
-	int i=0, j=0;
-	for( j=0;j<=NUM_Z;j++) {
-		for( i=0;i<=NUM_X;i++) {
-			vertices[count++] = glm::vec3( ((float(i)/(NUM_X-1)) *2-1)* HALF_SIZE_X, 0, ((float(j)/(NUM_Z-1))*2-1)*HALF_SIZE_Z);
-		}
-	}
+	//setup quad geometry
+	//setup quad vertices
+	vertices[0] = glm::vec3(-5,0,-5);
+	vertices[1] = glm::vec3(-5,0,5);
+	vertices[2] = glm::vec3(5,0,5);
+	vertices[3] = glm::vec3(5,0,-5);
 
-	//fill plane indices array
+	//setup quad indices
 	GLushort* id=&indices[0];
-	for (i = 0; i < NUM_Z; i++) {
-		for (j = 0; j < NUM_X; j++) {
-			int i0 = i * (NUM_X+1) + j;
-			int i1 = i0 + 1;
-			int i2 = i0 + (NUM_X+1);
-			int i3 = i2 + 1;
-			if ((j+i)%2) {
-				*id++ = i0; *id++ = i2; *id++ = i1;
-				*id++ = i1; *id++ = i2; *id++ = i3;
-			} else {
-				*id++ = i0; *id++ = i2; *id++ = i3;
-				*id++ = i0; *id++ = i3; *id++ = i1;
-			}
-		}
-	}
+ 	*id++ = 0;
+	*id++ = 1;
+	*id++ = 2;
+
+	*id++ = 0;
+	*id++ = 2;
+	*id++ = 3;
 
 	GL_CHECK_ERRORS
 
-	//setup plane vao and vbo stuff
+	//setup quad vao and vbo stuff
 	glGenVertexArrays(1, &vaoID);
 	glGenBuffers(1, &vboVerticesID);
 	glGenBuffers(1, &vboIndicesID);
@@ -181,17 +171,22 @@ void OnInit() {
 	glBindVertexArray(vaoID);
 
 		glBindBuffer (GL_ARRAY_BUFFER, vboVerticesID);
-		//pass plane vertices to array buffer object
+		//pass the quad vertices to buffer object
 		glBufferData (GL_ARRAY_BUFFER, sizeof(vertices), &vertices[0], GL_STATIC_DRAW);
 		GL_CHECK_ERRORS
-		//enable vertex attrib array for position
+		//enable vertex attribute array for position
 		glEnableVertexAttribArray(shader["vVertex"]);
 		glVertexAttribPointer(shader["vVertex"], 3, GL_FLOAT, GL_FALSE,0,0);
 		GL_CHECK_ERRORS
-		//pass the plane indices to element array buffer
+		//pass the quad indices to element array buffer
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vboIndicesID);
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), &indices[0], GL_STATIC_DRAW);
 		GL_CHECK_ERRORS
+
+	//set the polygon mode to render lines
+	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+	GL_CHECK_ERRORS
 			  
 	cout<<"Initialization successfull"<<endl;
 }
@@ -236,26 +231,25 @@ void OnRender() {
 	// //glutSwapBuffers();
 
 
-	//get the elapse time::CHECK
-	timee = glfwGetTime()/1000.0f * SPEED;
+	//clear colour and depth buffer
+	//glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 
-	glm::mat4 T=glm::translate(glm::mat4(1.0f),
-	glm::vec3(0.0f, 0.0f, dist));
-	glm::mat4 Rx= glm::rotate(T, rX, glm::vec3(1.0f, 0.0f,
-	0.0f));
-	glm::mat4 MV= glm::rotate(Rx, rY, glm::vec3(0.0f, 1.0f,
-	0.0f));
-	glm::mat4 MVP= P*MV;
+	glm::mat4 T	 = glm::translate(glm::mat4(1.0f),glm::vec3(0.0f, 0.0f, dist));
+	glm::mat4 Rx = glm::rotate(T,  rX, glm::vec3(1.0f, 0.0f, 0.0f));
+	glm::mat4 V	 = glm::rotate(Rx, rY, glm::vec3(0.0f, 1.0f, 0.0f));
+	glm::mat4 PV = P*V;
+
+	//bind the shader
 	shader.Use();
-	glUniformMatrix4fv(shader("MVP"), 1, GL_FALSE,
-	glm::value_ptr(MVP));
-	glUniform1f(shader("timee"), timee);
-	glDrawElements(GL_TRIANGLES,TOTAL_INDICES,
-	GL_UNSIGNED_SHORT,0);
-	shader.UnUse();
-	
+		//set the shader uniforms
+		glUniformMatrix4fv(shader("PV"), 1, GL_FALSE, glm::value_ptr(PV));
+		glUniform1i(shader("sub_divisions"), sub_divisions);
+			//render instanced geometry
+		glDrawElementsInstanced(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, 0, 4);
+		//unbind shader
+		shader.UnUse();
+
 	//swap front and back buffers to show the rendered result
-	//glutSwapBuffers();
 }
 
 GLFWwindow *initialize()
@@ -311,7 +305,8 @@ int main() {
 
     while (!glfwWindowShouldClose(window))
     {
-        glClear(GL_COLOR_BUFFER_BIT);
+		glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+        //glClear(GL_COLOR_BUFFER_BIT);
         OnRender();
         glfwSwapBuffers(window);
 		glfw_mouse_inputs(window);

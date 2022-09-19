@@ -1,9 +1,10 @@
 #include "GLSLShader.h"
 #include <iostream>
 
+
 GLSLShader::GLSLShader(void)
 {
-    _totalShaders=0;
+	_totalShaders=0;
 	_shaders[VERTEX_SHADER]=0;
 	_shaders[FRAGMENT_SHADER]=0;
 	_shaders[GEOMETRY_SHADER]=0;
@@ -21,18 +22,17 @@ void GLSLShader::DeleteShaderProgram() {
 	glDeleteProgram(_program);
 }
 
-void GLSLShader::LoadFromString(GLenum type, const string& source)
-{
-    GLuint shader = glCreateShader(type);
+void GLSLShader::LoadFromString(GLenum type, const string& source) {	
+	GLuint shader = glCreateShader (type);
 
-    const char * ptmp = source.c_str();
-    glShaderSource(shader, 1, &ptmp, NULL);
-
-    //check whether the shader loads fine
-    GLint status;
-    glCompileShader(shader);
-    glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
-    if (status == GL_FALSE) {
+	const char * ptmp = source.c_str();
+	glShaderSource (shader, 1, &ptmp, NULL);
+	
+	//check whether the shader loads fine
+	GLint status;
+	glCompileShader (shader);
+	glGetShaderiv (shader, GL_COMPILE_STATUS, &status);
+	if (status == GL_FALSE) {
 		GLint infoLogLength;		
 		glGetShaderiv (shader, GL_INFO_LOG_LENGTH, &infoLogLength);
 		GLchar *infoLog= new GLchar[infoLogLength];
@@ -42,6 +42,7 @@ void GLSLShader::LoadFromString(GLenum type, const string& source)
 	}
 	_shaders[_totalShaders++]=shader;
 }
+
 
 void GLSLShader::CreateAndLinkProgram() {
 	_program = glCreateProgram ();
