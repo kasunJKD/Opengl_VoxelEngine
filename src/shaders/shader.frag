@@ -1,9 +1,8 @@
-#version 330 core
- 
-layout(location=0) out vec4 vFragColor;	//fragment shader output
+#version 330
 
-void main()
+out vec4 vFragColor;
+
+void main(void)
 {
-	//output a constant white colour vec4(1,1,1,1)
    vFragColor = vec4(1,1,1,1);
 }

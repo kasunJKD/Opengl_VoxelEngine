@@ -1,11 +1,10 @@
-#version 330 core
+#version 330
   
-layout(location=0) in vec3 vVertex;  //object space vertex position
+in vec3 vVertex; 
 
-uniform mat4 M[4];	//modeling matrix for each instance
+uniform mat4 MVP;  
 
 void main()
-{    
-	//get the world space position of each instance vertex
-	gl_Position =  M[gl_InstanceID]*vec4(vVertex, 1);		
+{  
+	gl_Position = MVP*vec4(vVertex.xyz,1);
 }
