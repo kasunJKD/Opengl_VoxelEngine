@@ -18,74 +18,123 @@ using namespace std;
 const int WIDTH = 1200;
 const int HEIGHT = 960;
 
-//shader reference
-GLSLShader shader;
+//for floating point imprecision
+const float EPSILON = 0.001f;
+const float EPSILON2 = EPSILON*EPSILON;
 
-//vertex array and vertex buffer object ids
-GLuint vaoID;
-GLuint vboVerticesID;
-GLuint vboIndicesID;
-
-//mesh vertices and indices
-glm::vec3 vertices[4];
-GLushort indices[6];
-
-//projection and modelview matrices
-glm::mat4  P = glm::mat4(1);
-glm::mat4 MV = glm::mat4(1);
-
-//camera transformation variables
+//camera tranformation variables
 int state = 0, oldX=0, oldY=0;
-float rX=25, rY=-40, dist = -50	;
- 
-//number of sub-divisions
-int sub_divisions = 1;
+float rX=0, rY=0, fov = 45;
 
-//modelling matrix of each instance
-glm::mat4 M[4];
+#include "FreeCamera.h"
 
-//mosue click handler
+//virtual key codes
+const int VK_W = 0x57;
+const int VK_S = 0x53;
+const int VK_A = 0x41;
+const int VK_D = 0x44;
+const int VK_Q = 0x51;
+const int VK_Z = 0x5a;
+
+//delta time
+float dt = 0;
+
+//timing related variables
+float last_time=0, current_time =0;
+
+//free camera instance
+CFreeCamera cam;
+
+//mouse filtering support variables
+const float MOUSE_FILTER_WEIGHT=0.75f;
+const int MOUSE_HISTORY_BUFFER_SIZE = 10;
+
+//mouse history buffer
+glm::vec2 mouseHistory[MOUSE_HISTORY_BUFFER_SIZE];
+
+float mouseX=0, mouseY=0; //filtered mouse values
+
+//flag to enable filtering
+bool useFiltering = true;
+
+//output message
+#include <sstream>
+std::stringstream msg;
+
+//floor checker texture ID
+GLuint checkerTextureID;
+
+
+//checkered plane object
+#include "TexturedPlane.h"
+CTexturedPlane* checker_plane;
+
+//mouse move filtering function
+void filterMouseMoves(float dx, float dy) {
+    for (int i = MOUSE_HISTORY_BUFFER_SIZE - 1; i > 0; --i) {
+        mouseHistory[i] = mouseHistory[i - 1];
+    }
+
+    // Store current mouse entry at front of array.
+    mouseHistory[0] = glm::vec2(dx, dy);
+
+    float averageX = 0.0f;
+    float averageY = 0.0f;
+    float averageTotal = 0.0f;
+    float currentWeight = 1.0f;
+
+    // Filter the mouse.
+    for (int i = 0; i < MOUSE_HISTORY_BUFFER_SIZE; ++i)
+    {
+		glm::vec2 tmp=mouseHistory[i];
+        averageX += tmp.x * currentWeight;
+        averageY += tmp.y * currentWeight;
+        averageTotal += 1.0f * currentWeight;
+        currentWeight *= MOUSE_FILTER_WEIGHT;
+    }
+
+    mouseX = averageX / averageTotal;
+    mouseY = averageY / averageTotal;
+
+}
+
+//mouse click handler
 void OnMouseDown(int button, int s, int x, int y)
 {
-	if (s == GLFW_KEY_DOWN)
+	if (s == GLUT_DOWN)
 	{
 		oldX = x;
 		oldY = y;
 	}
 
-	if(button == GLFW_MOUSE_BUTTON_MIDDLE)
+	if(button == GLUT_MIDDLE_BUTTON)
 		state = 0;
 	else
 		state = 1;
 }
 
-//mosue move handler
+//mouse move handler
 void OnMouseMove(int x, int y)
 {
-	if (state == 0)
-		dist *= (1 + (y - oldY)/60.0f);
-	else
-	{
-		rY += (x - oldX)/5.0f;
-		rX += (y - oldY)/5.0f;
+	if (state == 0) {
+		fov += (y - oldY)/5.0f;
+		cam.SetupProjection(fov, cam.GetAspectRatio());
+	} else {
+		rY += (y - oldY)/5.0f;
+		rX += (oldX-x)/5.0f;
+		if(useFiltering)
+			filterMouseMoves(rX, rY);
+		else {
+			mouseX = rX;
+			mouseY = rY;
+		}
+		cam.Rotate(mouseX,mouseY, 0);
 	}
 	oldX = x;
 	oldY = y;
 
-	//glutPostRedisplay();
+	glutPostRedisplay();
 }
-
-//key event handler to increase/decrease number of sub-divisions
-// void OnKey(unsigned char key, int x, int y) {
-// 	switch(key) {
-// 		case ',':	sub_divisions--; break;
-// 		case '.':	sub_divisions++; break;
-// 	}
-
-// 	sub_divisions = max(1,min(8, sub_divisions));
-
-// 	//glutPostRedisplay();
-// }
 
 void glfw_mouse_inputs(GLFWwindow* window) {
 	// Stores the coordinates of the cursor
@@ -114,142 +163,154 @@ void glfw_mouse_inputs(GLFWwindow* window) {
 	oldY = mouseY;
 }
 
-
-//Opengl initialization
+//initialize OpenGL
 void OnInit() {
-	//set the instance modeling matrix
-	M[0] = glm::translate(glm::mat4(1), glm::vec3(-5,0,-5));
-	M[1] = glm::translate(M[0], glm::vec3(10,0,0));
-	M[2] = glm::translate(M[1], glm::vec3(0,0,10));
-	M[3] = glm::translate(M[2], glm::vec3(-10,0,0));
-
 	GL_CHECK_ERRORS
-	//load shader
-	shader.LoadFromFile(GL_VERTEX_SHADER, "shaders/shader.vert");
-	shader.LoadFromFile(GL_GEOMETRY_SHADER, "shaders/shader.geom");
-	shader.LoadFromFile(GL_FRAGMENT_SHADER, "shaders/shader.frag");
-	//compile and link shader
-	shader.CreateAndLinkProgram();
-	shader.Use();
-		//add attribute and uniform
-		shader.AddAttribute("vVertex");
-		shader.AddUniform("PV");
-		shader.AddUniform("M");
-		shader.AddUniform("sub_divisions");
-
-		//set values of constant uniforms at initialization
-		glUniform1i(shader("sub_divisions"), sub_divisions);
-		glUniformMatrix4fv(shader("M"), 4, GL_FALSE, glm::value_ptr(M[0]));
- 	shader.UnUse();
+	//generate the checker texture
+	GLubyte data[128][128]={0};
+	for(int j=0;j<128;j++) {
+		for(int i=0;i<128;i++) {
+			data[i][j]=(i<=64 && j<=64 || i>64 && j>64 )?255:0;
+		}
+	}
+	//generate texture object
+	glGenTextures(1, &checkerTextureID);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, checkerTextureID);
+	//set texture parameters
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
 	GL_CHECK_ERRORS
 
-	//setup quad geometry
-	//setup quad vertices
-	vertices[0] = glm::vec3(-5,0,-5);
-	vertices[1] = glm::vec3(-5,0,5);
-	vertices[2] = glm::vec3(5,0,5);
-	vertices[3] = glm::vec3(5,0,-5);
+	//set maximum aniostropy setting
+	GLfloat largest_supported_anisotropy;
+	glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &largest_supported_anisotropy);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, largest_supported_anisotropy);
 
-	//setup quad indices
-	GLushort* id=&indices[0];
- 	*id++ = 0;
-	*id++ = 1;
-	*id++ = 2;
+	//set mipmap base and max level
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 4);
 
-	*id++ = 0;
-	*id++ = 2;
-	*id++ = 3;
+	//allocate texture object
+	glTexImage2D(GL_TEXTURE_2D,0,GL_RED, 128, 128, 0, GL_RED, GL_UNSIGNED_BYTE, data);
+
+	//generate mipmaps
+	glGenerateMipmap(GL_TEXTURE_2D);
 
 	GL_CHECK_ERRORS
 
-	//setup quad vao and vbo stuff
-	glGenVertexArrays(1, &vaoID);
-	glGenBuffers(1, &vboVerticesID);
-	glGenBuffers(1, &vboIndicesID);
-
-	glBindVertexArray(vaoID);
-
-		glBindBuffer (GL_ARRAY_BUFFER, vboVerticesID);
-		//pass the quad vertices to buffer object
-		glBufferData (GL_ARRAY_BUFFER, sizeof(vertices), &vertices[0], GL_STATIC_DRAW);
-		GL_CHECK_ERRORS
-		//enable vertex attribute array for position
-		glEnableVertexAttribArray(shader["vVertex"]);
-		glVertexAttribPointer(shader["vVertex"], 3, GL_FLOAT, GL_FALSE,0,0);
-		GL_CHECK_ERRORS
-		//pass the quad indices to element array buffer
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vboIndicesID);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), &indices[0], GL_STATIC_DRAW);
-		GL_CHECK_ERRORS
-
-	//set the polygon mode to render lines
-	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	//create a textured plane object
+	checker_plane = new CTexturedPlane();
 
 	GL_CHECK_ERRORS
-			  
+
+	//setup camera
+	//setup the camera position and look direction
+	glm::vec3 p = glm::vec3(5);
+	cam.SetPosition(p);
+	glm::vec3 look =  glm::normalize(p);
+
+	//rotate the camera for proper orientation
+	float yaw = glm::degrees(float(atan2(look.z, look.x)+M_PI));
+	float pitch = glm::degrees(asin(look.y));
+	rX = yaw;
+	rY = pitch;
+	if(useFiltering) {
+		for (int i = 0; i < MOUSE_HISTORY_BUFFER_SIZE ; ++i) {
+			mouseHistory[i] = glm::vec2(rX, rY);
+		}
+	}
+	cam.Rotate(rX,rY,0);
 	cout<<"Initialization successfull"<<endl;
 }
 
-//release all allocated resources
+//delete all allocated resources
 void OnShutdown() {
-	//Destroy shader
-	shader.DeleteShaderProgram();
 
-	//Destroy vao and vbo
-	glDeleteBuffers(1, &vboVerticesID);
-	glDeleteBuffers(1, &vboIndicesID);
-	glDeleteVertexArrays(1, &vaoID);
-
+	delete checker_plane;
+	glDeleteTextures(1, &checkerTextureID);
 	cout<<"Shutdown successfull"<<endl;
 }
 
 //resize event handler
 void OnResize(int w, int h) {
-	//set the viewport size
+	//set the viewport
 	glViewport (0, 0, (GLsizei) w, (GLsizei) h);
-	//setup the projection matrix
-	P = glm::perspective(glm::radians(45.0f), (GLfloat)w/h, 1.f, 1000.f);
+	//setup the camera projection matrix
+	cam.SetupProjection(45, (GLfloat)w/h); 
+}
+
+//idle event processing
+void OnIdle() {
+
+	//handle the WSAD, QZ key events to move the camera around
+	if( GetAsyncKeyState(VK_W) & 0x8000) {
+		cam.Walk(dt);
+	}
+
+	if( GetAsyncKeyState(VK_S) & 0x8000) {
+		cam.Walk(-dt);
+	}
+
+	if( GetAsyncKeyState(VK_A) & 0x8000) {
+		cam.Strafe(-dt);
+	}
+
+	if( GetAsyncKeyState(VK_D) & 0x8000) {
+		cam.Strafe(dt);
+	}
+
+	if( GetAsyncKeyState(VK_Q) & 0x8000) {
+		cam.Lift(dt);
+	}
+
+	if( GetAsyncKeyState(VK_Z) & 0x8000) {
+		cam.Lift(-dt);
+	}
+
+	glm::vec3 t = cam.GetTranslation(); 
+	if(glm::dot(t,t)>EPSILON2) {
+		cam.SetTranslation(t*0.95f);
+	}
+
+	//call the display function
+	glutPostRedisplay();
 }
 
 //display callback function
 void OnRender() {
+	//timing related calcualtion
+	last_time = current_time;
+	current_time = glutGet(GLUT_ELAPSED_TIME)/1000.0f;
+	dt = current_time-last_time;
 
-	// //clear the colour and depth buffer
-	// glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+	//clear color buffer and depth buffer
+	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+ 
+	//set the camera transformation
+	glm::mat4 MV	= cam.GetViewMatrix();
+	glm::mat4 P     = cam.GetProjectionMatrix();
+    glm::mat4 MVP	= P*MV;
 
-	// //bind the shader
-	// shader.Use();
-	// 	//pass the shader uniform
-	// 	glUniformMatrix4fv(shader("MVP"), 1, GL_FALSE, glm::value_ptr(P*MV));
-	// 		//drwa triangle
-	// 		glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_SHORT, 0);
-	// //unbind the shader
-	// shader.UnUse();
-	 
-	// //swap front and back buffers to show the rendered result
-	// //glutSwapBuffers();
-
-
-	//clear colour and depth buffer
-	//glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-
-	glm::mat4 T	 = glm::translate(glm::mat4(1.0f),glm::vec3(0.0f, 0.0f, dist));
-	glm::mat4 Rx = glm::rotate(T,  rX, glm::vec3(1.0f, 0.0f, 0.0f));
-	glm::mat4 V	 = glm::rotate(Rx, rY, glm::vec3(0.0f, 1.0f, 0.0f));
-	glm::mat4 PV = P*V;
-
-	//bind the shader
-	shader.Use();
-		//set the shader uniforms
-		glUniformMatrix4fv(shader("PV"), 1, GL_FALSE, glm::value_ptr(PV));
-		glUniform1i(shader("sub_divisions"), sub_divisions);
-			//render instanced geometry
-		glDrawElementsInstanced(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, 0, 4);
-		//unbind shader
-		shader.UnUse();
+	//render the chekered plane
+	checker_plane->Render(glm::value_ptr(MVP));
 
 	//swap front and back buffers to show the rendered result
+	glutSwapBuffers();
+
+}
+
+//Keyboard event handler to toggle the mouse filtering using spacebar key
+void OnKey(unsigned char key, int x, int y) {
+	switch(key) {
+		case ' ':
+			useFiltering = !useFiltering;
+		break;
+	}
+	glutPostRedisplay();
 }
 
 GLFWwindow *initialize()
@@ -295,6 +356,8 @@ int main() {
         return 0;
     }
 
+	//print information on screen
+	cout<<"\tUsing GLEW "<<glewGetString(GLEW_VERSION)<<endl;
 	cout<<"\tVendor: "<<glGetString (GL_VENDOR)<<endl;
 	cout<<"\tRenderer: "<<glGetString (GL_RENDERER)<<endl;
 	cout<<"\tVersion: "<<glGetString (GL_VERSION)<<endl;
