@@ -46,3 +46,20 @@ void CFreeCamera::Strafe(const float amount) {
 void CFreeCamera::Lift(const float amount) {
 	translation += (up*amount);
 }
+
+void CFreeCamera::SetTranslation(const glm::vec3& t) {
+	translation = t;
+	Update();
+}
+
+glm::vec3 CFreeCamera::GetTranslation() const {
+	return translation;
+}
+
+void CFreeCamera::SetSpeed(const float s) {
+	speed = s;
+}
+
+const float CFreeCamera::GetSpeed() const {
+	return speed;
+}

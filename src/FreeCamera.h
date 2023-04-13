@@ -14,9 +14,15 @@ public:
 	void Strafe(const float amount);
 	void Lift(const float amount);
 	 
+	void SetTranslation(const glm::vec3& t);
+	glm::vec3 GetTranslation() const;
+
+	void SetSpeed(const float speed);
+	const float GetSpeed() const;
+
 
 protected:
-	float yaw, pitch, roll;
+	float yaw, pitch, roll, speed;
 	
 	glm::vec3 translation;
 };

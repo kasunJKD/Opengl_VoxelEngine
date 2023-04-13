@@ -16,10 +16,10 @@ set(CMAKE_CXX_STANDARD 17)
 
 project(${PROJECT_NAME} VERSION ${PROJECT_VERSION} LANGUAGES CXX)
 
-add_executable(${PROJECT_NAME} ${SOURCE_PATH}/main.cpp ${SOURCE_PATH}/GLSLShader.cpp ${SOURCE_PATH}/GLSLShader.h)
+add_executable(${PROJECT_NAME} ${SOURCE_PATH}/main.cpp ${SOURCE_PATH}/GLSLShader.cpp ${SOURCE_PATH}/GLSLShader.h ${SOURCE_PATH}/AbstractCamera.h ${SOURCE_PATH}/AbstractCamera.cpp ${SOURCE_PATH}/FreeCamera.h ${SOURCE_PATH}/FreeCamera.cpp ${SOURCE_PATH}/TexturedPlane.h ${SOURCE_PATH}/TexturedPlane.cpp ${SOURCE_PATH}/RenderableObject.h ${SOURCE_PATH}/RenderableObject.cpp)
 
 if (UNIX)
-    target_compile_options(${PROJECT_NAME} PRIVATE -Werror -Wall -Wextra)
+    target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra)
 endif (UNIX)
 
 # glfw

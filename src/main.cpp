@@ -12,6 +12,7 @@
 
 #define GL_CHECK_ERRORS assert(glGetError()==GL_NO_ERROR);
 
+
 using namespace std;
 
 //screen size
@@ -29,12 +30,12 @@ float rX=0, rY=0, fov = 45;
 #include "FreeCamera.h"
 
 //virtual key codes
-const int VK_W = 0x57;
-const int VK_S = 0x53;
-const int VK_A = 0x41;
-const int VK_D = 0x44;
-const int VK_Q = 0x51;
-const int VK_Z = 0x5a;
+// const int VK_W = 0x57;
+// const int VK_S = 0x53;
+// const int VK_A = 0x41;
+// const int VK_D = 0x44;
+// const int VK_Q = 0x51;
+// const int VK_Z = 0x5a;
 
 //delta time
 float dt = 0;
@@ -99,15 +100,15 @@ void filterMouseMoves(float dx, float dy) {
 }
 
 //mouse click handler
-void OnMouseDown(int button, int s, int x, int y)
+void OnMouseDown(GLFWwindow *window, int x, int y)
 {
-	if (s == GLUT_DOWN)
+	if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)
 	{
 		oldX = x;
 		oldY = y;
 	}
 
-	if(button == GLUT_MIDDLE_BUTTON)
+	if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_MIDDLE) == GLFW_PRESS)
 		state = 0;
 	else
 		state = 1;
@@ -133,7 +134,7 @@ void OnMouseMove(int x, int y)
 	oldX = x;
 	oldY = y;
 
-	glutPostRedisplay();
+	//glutPostRedisplay();
 }
 
 void glfw_mouse_inputs(GLFWwindow* window) {
@@ -143,21 +144,39 @@ void glfw_mouse_inputs(GLFWwindow* window) {
 		// Fetches the coordinates of the cursor
 	glfwGetCursorPos(window, &mouseX, &mouseY);
 
-	if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
-		// Hides mouse cursor
+	if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)
+	{
 		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
-		state = 0;
+		oldX = mouseX;
+		oldY = mouseY;
 	}
+
+	if(glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_MIDDLE) == GLFW_PRESS)
+		state = 0;
 	else
-	 state = 1;
+		state = 1;
+
+	// if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+	// 	// Hides mouse cursor
+	// 	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+	// 	state = 0;
+	// }
+	// else
+	//  state = 1;
 
 	if (state == 0) {
-		dist *= (1 + (mouseY - oldY)/60.0f);
-	}
-	else
-	{
-		rY += (mouseX - oldX)/5.0f;
-		rX += (mouseY - oldY)/5.0f;
+		fov += (mouseY - oldY)/5.0f;
+		cam.SetupProjection(fov, cam.GetAspectRatio());
+	} else {
+		rY += (mouseY - oldY)/5.0f;
+		rX += (oldX-mouseX)/5.0f;
+		if(useFiltering)
+			filterMouseMoves(rX, rY);
+		else {
+			mouseX = rX;
+			mouseY = rY;
+		}
+		cam.Rotate(mouseX,mouseY, 0);
 	}
 	oldX = mouseX;
 	oldY = mouseY;
@@ -170,7 +189,7 @@ void OnInit() {
 	GLubyte data[128][128]={0};
 	for(int j=0;j<128;j++) {
 		for(int i=0;i<128;i++) {
-			data[i][j]=(i<=64 && j<=64 || i>64 && j>64 )?255:0;
+			data[i][j]=((i<=64 && j<=64) || (i>64 && j>64) )?255:0;
 		}
 	}
 	//generate texture object
@@ -187,8 +206,8 @@ void OnInit() {
 
 	//set maximum aniostropy setting
 	GLfloat largest_supported_anisotropy;
-	glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &largest_supported_anisotropy);
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, largest_supported_anisotropy);
+	glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &largest_supported_anisotropy);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY, largest_supported_anisotropy);
 
 	//set mipmap base and max level
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
@@ -244,48 +263,84 @@ void OnResize(int w, int h) {
 }
 
 //idle event processing
-void OnIdle() {
+// void OnIdle() {
 
-	//handle the WSAD, QZ key events to move the camera around
-	if( GetAsyncKeyState(VK_W) & 0x8000) {
-		cam.Walk(dt);
+// 	//handle the WSAD, QZ key events to move the camera around
+// 	if( GetAsyncKeyState(VK_W) & 0x8000) {
+// 		cam.Walk(dt);
+// 	}
+
+// 	if( GetAsyncKeyState(VK_S) & 0x8000) {
+// 		cam.Walk(-dt);
+// 	}
+
+// 	if( GetAsyncKeyState(VK_A) & 0x8000) {
+// 		cam.Strafe(-dt);
+// 	}
+
+// 	if( GetAsyncKeyState(VK_D) & 0x8000) {
+// 		cam.Strafe(dt);
+// 	}
+
+// 	if( GetAsyncKeyState(VK_Q) & 0x8000) {
+// 		cam.Lift(dt);
+// 	}
+
+// 	if( GetAsyncKeyState(VK_Z) & 0x8000) {
+// 		cam.Lift(-dt);
+// 	}
+
+// 	glm::vec3 t = cam.GetTranslation(); 
+// 	if(glm::dot(t,t)>EPSILON2) {
+// 		cam.SetTranslation(t*0.95f);
+// 	}
+
+// 	//call the display function
+// 	//glutPostRedisplay();
+// }
+
+void processInput(GLFWwindow *window)
+{
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+	{
+        glfwSetWindowShouldClose(window, true);
 	}
 
-	if( GetAsyncKeyState(VK_S) & 0x8000) {
-		cam.Walk(-dt);
+	if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
+	{
+		useFiltering = !useFiltering;
 	}
 
-	if( GetAsyncKeyState(VK_A) & 0x8000) {
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+        cam.Walk(dt);
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+        cam.Walk(-dt);
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
 		cam.Strafe(-dt);
-	}
-
-	if( GetAsyncKeyState(VK_D) & 0x8000) {
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
 		cam.Strafe(dt);
-	}
-
-	if( GetAsyncKeyState(VK_Q) & 0x8000) {
+	if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
 		cam.Lift(dt);
-	}
-
-	if( GetAsyncKeyState(VK_Z) & 0x8000) {
-		cam.Lift(-dt);
-	}
+	if (glfwGetKey(window, GLFW_KEY_Z) == GLFW_PRESS)
+		cam.Lift(dt);
 
 	glm::vec3 t = cam.GetTranslation(); 
-	if(glm::dot(t,t)>EPSILON2) {
+	if(glm::dot(t,t)>EPSILON2)
+	{
 		cam.SetTranslation(t*0.95f);
 	}
-
-	//call the display function
-	glutPostRedisplay();
 }
 
 //display callback function
 void OnRender() {
 	//timing related calcualtion
 	last_time = current_time;
-	current_time = glutGet(GLUT_ELAPSED_TIME)/1000.0f;
-	dt = current_time-last_time;
+	//current_time = glutGet(GLUT_ELAPSED_TIME)/1000.0f;
+	//dt = current_time-last_time;
+
+	float currentFrame = static_cast<float>(glfwGetTime());
+    dt = currentFrame - last_time;
+    //lastFrame = currentFrame;
 
 	//clear color buffer and depth buffer
 	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
@@ -299,19 +354,19 @@ void OnRender() {
 	checker_plane->Render(glm::value_ptr(MVP));
 
 	//swap front and back buffers to show the rendered result
-	glutSwapBuffers();
+	//glutSwapBuffers();
 
 }
 
 //Keyboard event handler to toggle the mouse filtering using spacebar key
-void OnKey(unsigned char key, int x, int y) {
-	switch(key) {
-		case ' ':
-			useFiltering = !useFiltering;
-		break;
-	}
-	glutPostRedisplay();
-}
+// void OnKey(unsigned char key, int x, int y) {
+// 	switch(key) {
+// 		case ' ':
+// 			useFiltering = !useFiltering;
+// 		break;
+// 	}
+// 	glutPostRedisplay();
+// }
 
 GLFWwindow *initialize()
 {
@@ -357,7 +412,6 @@ int main() {
     }
 
 	//print information on screen
-	cout<<"\tUsing GLEW "<<glewGetString(GLEW_VERSION)<<endl;
 	cout<<"\tVendor: "<<glGetString (GL_VENDOR)<<endl;
 	cout<<"\tRenderer: "<<glGetString (GL_RENDERER)<<endl;
 	cout<<"\tVersion: "<<glGetString (GL_VERSION)<<endl;
@@ -368,11 +422,12 @@ int main() {
 
     while (!glfwWindowShouldClose(window))
     {
-		glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+		//glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
         //glClear(GL_COLOR_BUFFER_BIT);
         OnRender();
-        glfwSwapBuffers(window);
 		glfw_mouse_inputs(window);
+		processInput(window);
+		glfwSwapBuffers(window);
         glfwPollEvents();
     }
 
