@@ -10,6 +10,7 @@ project(GL_PROJECT
 add_executable(gl_project
   "src/main.cpp"
   "src/glad.c"
+  "src/GLShader.cpp"
 )
 
 # Specify include directories for our executable:
