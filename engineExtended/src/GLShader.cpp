@@ -1,8 +1,8 @@
-#include "GLSLShader.h"
+#include "GLShader.h"
 #include <iostream>
 
 
-GLSLShader::GLSLShader(void)
+GLShader::GLShader(void)
 {
 	_totalShaders=0;
 	_shaders[VERTEX_SHADER]=0;
@@ -12,17 +12,17 @@ GLSLShader::GLSLShader(void)
 	_uniformLocationList.clear();
 }
 
-GLSLShader::~GLSLShader(void)
+GLShader::~GLShader(void)
 {
 	_attributeList.clear();	
 	_uniformLocationList.clear();
 }
 
-void GLSLShader::DeleteShaderProgram() {	
+void GLShader::DeleteShaderProgram() {	
 	glDeleteProgram(_program);
 }
 
-void GLSLShader::LoadFromString(GLenum type, const string& source) {	
+void GLShader::LoadFromString(GLenum type, const string& source) {	
 	GLuint shader = glCreateShader (type);
 
 	const char * ptmp = source.c_str();
@@ -44,7 +44,7 @@ void GLSLShader::LoadFromString(GLenum type, const string& source) {
 }
 
 
-void GLSLShader::CreateAndLinkProgram() {
+void GLShader::CreateAndLinkProgram() {
 	_program = glCreateProgram ();
 	if (_shaders[VERTEX_SHADER] != 0) {
 		glAttachShader (_program, _shaders[VERTEX_SHADER]);
@@ -75,33 +75,33 @@ void GLSLShader::CreateAndLinkProgram() {
 	glDeleteShader(_shaders[GEOMETRY_SHADER]);
 }
 
-void GLSLShader::Use() {
+void GLShader::Use() {
 	glUseProgram(_program);
 }
 
-void GLSLShader::UnUse() {
+void GLShader::UnUse() {
 	glUseProgram(0);
 }
 
-void GLSLShader::AddAttribute(const string& attribute) {
+void GLShader::AddAttribute(const string& attribute) {
 	_attributeList[attribute]= glGetAttribLocation(_program, attribute.c_str());	
 }
 
 //An indexer that returns the location of the attribute
-GLuint GLSLShader::operator [](const string& attribute) {
+GLuint GLShader::operator [](const string& attribute) {
 	return _attributeList[attribute];
 }
 
-void GLSLShader::AddUniform(const string& uniform) {
+void GLShader::AddUniform(const string& uniform) {
 	_uniformLocationList[uniform] = glGetUniformLocation(_program, uniform.c_str());
 }
 
-GLuint GLSLShader::operator()(const string& uniform){
+GLuint GLShader::operator()(const string& uniform){
 	return _uniformLocationList[uniform];
 }
 
 #include <fstream>
-void GLSLShader::LoadFromFile(GLenum whichShader, const string& filename){
+void GLShader::LoadFromFile(GLenum whichShader, const string& filename){
 	ifstream fp;
 	fp.open(filename.c_str(), ios_base::in);
 	if(fp) {		 
