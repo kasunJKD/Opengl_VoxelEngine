@@ -17,15 +17,15 @@ public:
   void UnUse();
   void AddAttribute(const string& attribute);
   void AddUniform(const string& uniform);
-
+  
   //An indexer that returns the location of the attribute/uniform
   GLuint operator[](const string& attribute);
   GLuint operator()(const string& uniform);
   void DeleteShaderProgram();
+  GLuint _program;
 
 private:
   enum ShaderType{VERTEX_SHADER, FRAGMENT_SHADER, GEOMETRY_SHADER};
-  GLuint _program;
   int _totalShaders;
   GLuint _shaders[3];
   map<string, GLuint> _attributeList;
