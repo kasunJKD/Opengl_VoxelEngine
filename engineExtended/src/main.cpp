@@ -43,6 +43,15 @@ unsigned int texture1;
         glm::vec3(-1.3f,  1.0f, -1.5f)
     };
 
+//camera
+glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
+glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
+glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
+
+//timing
+float deltaTime = 0.0f;
+float lastFrame = 0.0f;
+
 void OnInit()
 { 
     // build and compile our shader program
@@ -146,9 +155,10 @@ void OnInit()
         std::cout << "Failed to load texture" << std::endl;
     }
     stbi_image_free(data); 
+    
     shader.Use();
-        shader.AddUniform("texture1");
-        glUniform1i(shader("texture1") , 0);
+    shader.AddUniform("texture1");
+    glUniform1i(shader("texture1") , 0);
 }
 
 int main()
@@ -189,15 +199,19 @@ int main()
     glEnable(GL_DEPTH_TEST);
 
     OnInit();
-
-
-    // uncomment this call to draw in wireframe polygons.
-    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    
+    glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+    glUniformMatrix4fv(glGetUniformLocation(shader._program, "projection"), 1, GL_FALSE, &projection[0][0]);
 
     // render loop
     // -----------
     while (!glfwWindowShouldClose(window))
     {
+        //per-frame time logic
+        float currentFrame = static_cast<float>(glfwGetTime());
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
+    
         // input
         // -----
         processInput(window);
@@ -213,18 +227,13 @@ int main()
         
         shader.Use();
         
-         // create transformations
-        glm::mat4 view          = glm::mat4(1.0f);
-        glm::mat4 projection    = glm::mat4(1.0f);
-       // model = glm::rotate(model, glm::radians(-55.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-        view  = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
-        projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+        // camera/view transformation
+        glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
         // retrieve the matrix uniform locations
         unsigned int viewLoc  = glGetUniformLocation(shader._program, "view");
         // pass them to the shaders (3 different ways)
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, &view[0][0]);
-        // note: currently we set the projection matrix each frame, but since the projection matrix rarely changes it's often best practice to set it outside the main loop only once.
-        glUniformMatrix4fv(glGetUniformLocation(shader._program, "projection"), 1, GL_FALSE, &projection[0][0]);
+        
         // render boxes
         glBindVertexArray(VAO);
         for (unsigned int i = 0; i < 10; i++)
@@ -264,6 +273,16 @@ void processInput(GLFWwindow *window)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
+
+    float cameraSpeed = static_cast<float>(2.5 * deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+        cameraPos += cameraSpeed * cameraFront;
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+        cameraPos -= cameraSpeed * cameraFront;
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+        cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+        cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
