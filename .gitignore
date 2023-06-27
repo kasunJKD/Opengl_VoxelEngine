@@ -48,6 +48,6 @@ compile_commands.json
 CTestTestfile.cmake
 _deps
 
-engineExtended/build
-engineExtended/.vs
-engineExtended/out
+engine/build
+engine/.vs
+engine/out
